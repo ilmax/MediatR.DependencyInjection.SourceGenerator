@@ -1,14 +1,16 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using MediatR.DependencyInjection.SourceGenerator.Registrations;
+using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 
-namespace MediatR.DependencyInjection.SourceGenerator
+namespace MediatR.DependencyInjection.SourceGenerator.Discovery
 {
-    public class GetAllSymbolsVisitor : SymbolVisitor
+    class RegistrationDiscovererSymbolVisitor : SymbolVisitor
     {
-        private readonly HashSet<Registration> _registrations = new HashSet<Registration>();
+        private readonly HashSet<IRegistration> _registrations = new HashSet<IRegistration>();
         private readonly Dictionary<INamedTypeSymbol, Lifetime> _wellknownInterfaces;
+        private static readonly SymbolDisplayFormat symbolDisplayFormat = new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
-        public GetAllSymbolsVisitor(Dictionary<INamedTypeSymbol, Lifetime> wellknownInterfaces)
+        public RegistrationDiscovererSymbolVisitor(Dictionary<INamedTypeSymbol, Lifetime> wellknownInterfaces)
         {
             _wellknownInterfaces = wellknownInterfaces;
         }
@@ -26,7 +28,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
 
         public override void VisitNamedType(INamedTypeSymbol symbol)
         {
-            if (symbol.TypeKind == TypeKind.Class && !symbol.IsUnboundGenericType)
+            if (symbol.TypeKind == TypeKind.Class && !symbol.IsGenericType && !symbol.IsAbstract)
             {
                 foreach (var implementedInterface in symbol.AllInterfaces)
                 {
@@ -37,6 +39,11 @@ namespace MediatR.DependencyInjection.SourceGenerator
                             // LOG something here
                         }
                     }
+                }
+
+                if (symbol.Name == MediatRSourceGenerator.ClassName)
+                {
+                    RegistrationClassNamespace = symbol.ContainingNamespace.ToDisplayString(symbolDisplayFormat);
                 }
             }
         }
@@ -52,9 +59,11 @@ namespace MediatR.DependencyInjection.SourceGenerator
             return false;
         }
 
-        private Registration ConstructRegistration(INamedTypeSymbol type, INamedTypeSymbol implementedInterface, Lifetime lifetime) =>
-            new Registration(implementedInterface.ToString(), type.ToString(), lifetime);
+        private GenericRegistration ConstructRegistration(INamedTypeSymbol type, INamedTypeSymbol implementedInterface, Lifetime lifetime) =>
+            new GenericRegistration(implementedInterface.ToString(), type.ToString(), lifetime);
 
-        public IEnumerable<Registration> Registrations => _registrations;
+        public IEnumerable<IRegistration> Registrations => _registrations;
+
+        public string RegistrationClassNamespace { get; private set; }
     }
 }

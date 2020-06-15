@@ -1,4 +1,4 @@
-﻿namespace MediatR.DependencyInjection.SourceGenerator
+﻿namespace MediatR.DependencyInjection.SourceGenerator.Registrations
 {
     public enum Lifetime
     {
