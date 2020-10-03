@@ -1,45 +1,74 @@
-﻿using MediatR.DependencyInjection.SourceGenerator.Discovery;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using MediatR.DependencyInjection.SourceGenerator.Discovery;
 using MediatR.DependencyInjection.SourceGenerator.Registrations;
 using MediatR.DependencyInjection.SourceGenerator.Writer;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 
 namespace MediatR.DependencyInjection.SourceGenerator
 {
-    // TODO Add support for writing this one with either environment variable or csproj file option (Partially done via the DEBUG_SOURCE_GENERATOR environment variable)
     // TODO Add discovery support for classes outside this compilation (i.e. in another project)
-    // TODO Add support for configure the class name + the namespace (Namespace configuration is partially done via a class name lookup using MediatRSourceGenerator.ClassName)
+    // TODO Report failures/diagnostics properly
     // TODO De-dup registrations
+    // TODO? Use proper Roslyn formatting
+    /// <summary>
+    /// A source generator used to generate a class a MediatR registration class at compile time, the source file can be inspecting the <see cref="https://github.com/dotnet/roslyn/blob/master/docs/features/source-generators.md#output-files">output files</see>
+    /// </summary>
     [Generator]
     public class MediatRSourceGenerator : ISourceGenerator
     {
-        private static Dictionary<INamedTypeSymbol, Lifetime> _wellKnownInterfacesLifetime = new Dictionary<INamedTypeSymbol, Lifetime>();
-        public const string ClassName = "MediatRServiceExtension";
-        private static string GeneratedClassName = $"{ClassName}.generated.cs";
-        private static bool? _isDebugEnabled;
+        private static readonly Dictionary<INamedTypeSymbol, Lifetime> WellKnownInterfacesLifetime = new Dictionary<INamedTypeSymbol, Lifetime>();
+        private const string ServiceCollectionTypeName = "Microsoft.Extensions.DependencyInjection.IServiceCollection";
+        private string _className = "MediatRServiceExtension";
+        private string _methodName = "AddMediatRRegistrations";
+
+        private string _defaultAccessModifier = "internal";
+        private string _defaultServicesParameterName = "services";
+
+        private string _classNamespace;
+        private string _generatedFileName;
 
         public void Execute(SourceGeneratorContext context)
         {
             //Debugger.Launch(); //Uncomment this to debug
-            InitializeMediatRInterfaces(context.Compilation, _wellKnownInterfacesLifetime);
-            RegistrationDiscovererSymbolVisitor visitor = new RegistrationDiscovererSymbolVisitor(_wellKnownInterfacesLifetime);
+
+            InitializeSourceGenerator(context);
+
+            var visitor = new RegistrationDiscovererSymbolVisitor(WellKnownInterfacesLifetime, _className, context.Compilation.GetTypeByMetadataName(ServiceCollectionTypeName));
             visitor.Visit(context.Compilation.Assembly.GlobalNamespace);
-            var writer = new RegistrationWriter();
-            var discoveredClassNamespace = visitor.RegistrationClassNamespace;
 
-            var source = writer.WriteRegistrations(visitor.Registrations, discoveredClassNamespace ?? context.Compilation.AssemblyName, !string.IsNullOrEmpty(discoveredClassNamespace));
+            var writerConfig = visitor.WriterConfig ?? new RegistrationWriterConfiguration(_classNamespace ?? context.Compilation.AssemblyName, _className, _defaultAccessModifier, _methodName, _defaultServicesParameterName);
 
-            if (Debug)
+            var writer = new RegistrationWriter(writerConfig);
+
+            var source = writer.WriteRegistrations(visitor.Registrations, visitor.WriterConfig != null);
+
+            context.AddSource(_generatedFileName, source);
+        }
+
+        private void InitializeSourceGenerator(SourceGeneratorContext context)
+        {
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue($"build_property.{nameof(MediatRSourceGenerator)}_ClassNamespace", out var classNamespace))
             {
-                File.WriteAllText(GeneratedClassName, source.ToString());
+                _classNamespace = classNamespace;
             }
-            else
+
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue($"build_property.{nameof(MediatRSourceGenerator)}_ClassName", out var className))
             {
-                context.AddSource(GeneratedClassName, source);
+                _className = className;
             }
+
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue($"build_property.{nameof(MediatRSourceGenerator)}_MethodName", out var methodName))
+            {
+                _methodName = methodName;
+            }
+
+            _generatedFileName = $"{_className}.generated.cs";
+            InitializeMediatRInterfaces(context.Compilation, WellKnownInterfacesLifetime);
+        }
+
+        public void Initialize(InitializationContext context)
+        {
         }
 
         private void InitializeMediatRInterfaces(Compilation compilation, Dictionary<INamedTypeSymbol, Lifetime> wellKnownInterfacesLifetime)
@@ -50,7 +79,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
                 Add(compilation, "MediatR.INotificationHandler`1", Lifetime.Transient, wellKnownInterfacesLifetime);
                 Add(compilation, "MediatR.Pipeline.IRequestPreProcessor`1", Lifetime.Transient, wellKnownInterfacesLifetime);
                 Add(compilation, "MediatR.Pipeline.IRequestPostProcessor`2", Lifetime.Transient, wellKnownInterfacesLifetime);
-                Add(compilation, "MediatR.Pipeline.IRequestExceptionHandler`2", Lifetime.Transient, wellKnownInterfacesLifetime);
+                Add(compilation, "MediatR.Pipeline.IRequestExceptionHandler`3", Lifetime.Transient, wellKnownInterfacesLifetime);
                 Add(compilation, "MediatR.Pipeline.IRequestExceptionAction`2", Lifetime.Transient, wellKnownInterfacesLifetime);
             }
 
@@ -63,11 +92,5 @@ namespace MediatR.DependencyInjection.SourceGenerator
                 }
             }
         }
-
-        public void Initialize(InitializationContext context)
-        {
-        }
-
-        public bool Debug => _isDebugEnabled ??= Environment.GetEnvironmentVariable("DEBUG_SOURCE_GENERATOR")?.Trim() == "1";
     }
 }

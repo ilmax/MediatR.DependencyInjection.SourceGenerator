@@ -7,15 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ConsoleTables" Version="2.4.1" />
-    <PackageReference Include="MediatR" Version="8.0.1" />
-    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="ConsoleTables" Version="2.4.2" />
+    <PackageReference Include="MediatR" Version="8.1.0" />
+    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="8.1.0" />
+    <!--<PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection.SourceGeneration" Version="0.0.1-alpha1" />-->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.5" />
   </ItemGroup>
 
-  <ItemGroup >
-    <ProjectReference Include="..\MediatR.DependencyInjection.SourceGenerator\MediatR.DependencyInjection.SourceGenerator.csproj"  OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"/>
+  <ItemGroup>
+    <ProjectReference Include="..\MediatR.DependencyInjection.SourceGenerator\MediatR.DependencyInjection.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

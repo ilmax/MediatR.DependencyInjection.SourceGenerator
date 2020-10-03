@@ -1,11 +1,11 @@
-﻿using ConsoleTables;
-using MediatR;
-using MediatR.Pipeline;
-using Microsoft.Extensions.DependencyInjection;
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ConsoleTables;
+using MediatR;
+using MediatR.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ConsoleApp1
 {
@@ -16,10 +16,25 @@ namespace ConsoleApp1
             var collection1 = new ServiceCollection();
             collection1.AddMediatR(typeof(Program).Assembly);
             DumpRegistrations(collection1);
+            InstantiateAllDependencies(collection1.BuildServiceProvider(), collection1);
 
             var collection2 = new ServiceCollection();
-            collection2.AddMediatR2();
+            collection2.AddMediatRRegistrations();
             DumpRegistrations(collection2);
+            InstantiateAllDependencies(collection2.BuildServiceProvider(), collection2);
+
+        }
+
+        private static void InstantiateAllDependencies(IServiceProvider serviceProvider, ServiceCollection serviceCollection)
+        {
+            using var scope = serviceProvider.CreateScope();
+            foreach (var serviceDescriptor in serviceCollection)
+            {
+                if (!serviceDescriptor.ServiceType.IsGenericTypeDefinition)
+                {
+                    scope.ServiceProvider.GetService(serviceDescriptor.ServiceType);
+                }
+            }
         }
 
         private static void DumpRegistrations(ServiceCollection collection)
@@ -51,7 +66,6 @@ namespace ConsoleApp1
             throw new NotImplementedException();
         }
     }
-
     public class AGenericHandler<TParam> : IRequestHandler<ARequestWithResponse, AResponse> where TParam : AResponse
     {
         public Task<AResponse> Handle(ARequestWithResponse request, CancellationToken cancellationToken)
@@ -59,7 +73,6 @@ namespace ConsoleApp1
             throw new NotImplementedException();
         }
     }
-
     public abstract class AbstractHandler : IRequestHandler<ARequestWithResponse, AResponse>
     {
         public Task<AResponse> Handle(ARequestWithResponse request, CancellationToken cancellationToken)
@@ -97,8 +110,8 @@ namespace ConsoleApp1
     }
 
 
-    static partial class MediatRServiceExtension
-    {
-        internal static partial void AddMediatR2(this IServiceCollection services);
-    }
+    //static partial class MediatRServiceExtension
+    //{
+    //    public static partial void AddMediatR2(this IServiceCollection services);
+    //}
 }

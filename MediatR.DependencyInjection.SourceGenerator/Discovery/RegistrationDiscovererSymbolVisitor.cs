@@ -1,18 +1,25 @@
-﻿using MediatR.DependencyInjection.SourceGenerator.Registrations;
+﻿using System;
+using MediatR.DependencyInjection.SourceGenerator.Registrations;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
+using MediatR.DependencyInjection.SourceGenerator.Writer;
 
 namespace MediatR.DependencyInjection.SourceGenerator.Discovery
 {
     class RegistrationDiscovererSymbolVisitor : SymbolVisitor
     {
+        private static readonly SymbolDisplayFormat SymbolDisplayFormat = new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
         private readonly HashSet<IRegistration> _registrations = new HashSet<IRegistration>();
-        private readonly Dictionary<INamedTypeSymbol, Lifetime> _wellknownInterfaces;
-        private static readonly SymbolDisplayFormat symbolDisplayFormat = new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+        private readonly Dictionary<INamedTypeSymbol, Lifetime> _wellKnownInterfaces;
 
-        public RegistrationDiscovererSymbolVisitor(Dictionary<INamedTypeSymbol, Lifetime> wellknownInterfaces)
+        private readonly string _sourceGeneratorClassName;
+        private readonly ITypeSymbol _serviceCollectionTypeSymbol;
+
+        public RegistrationDiscovererSymbolVisitor(Dictionary<INamedTypeSymbol, Lifetime> wellKnownInterfaces, string sourceGeneratorClassName, ITypeSymbol serviceCollectionTypeSymbol)
         {
-            _wellknownInterfaces = wellknownInterfaces;
+            _wellKnownInterfaces = wellKnownInterfaces;
+            _sourceGeneratorClassName = sourceGeneratorClassName;
+            _serviceCollectionTypeSymbol = serviceCollectionTypeSymbol;
         }
 
         public override void VisitNamespace(INamespaceSymbol symbol)
@@ -41,18 +48,53 @@ namespace MediatR.DependencyInjection.SourceGenerator.Discovery
                     }
                 }
 
-                if (symbol.Name == MediatRSourceGenerator.ClassName)
+                if (symbol.Name == _sourceGeneratorClassName)
                 {
-                    RegistrationClassNamespace = symbol.ContainingNamespace.ToDisplayString(symbolDisplayFormat);
+                    WriterConfig = InitializeWriterConfiguration(symbol);
                 }
             }
+        }
+
+        private RegistrationWriterConfiguration InitializeWriterConfiguration(INamedTypeSymbol symbol)
+        {
+            foreach (var member in symbol.GetMembers())
+            {
+                if (member.Kind == SymbolKind.Method && member.IsStatic && member is IMethodSymbol methodSymbol && methodSymbol.IsExtensionMethod)
+                {
+                    foreach (var methodSymbolParameter in methodSymbol.Parameters)
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(methodSymbolParameter.Type, _serviceCollectionTypeSymbol))
+                        {
+                            return new RegistrationWriterConfiguration(
+                                symbol.ContainingNamespace.ToDisplayString(SymbolDisplayFormat),
+                                _sourceGeneratorClassName,
+                                ToStringAccessibility(methodSymbol.DeclaredAccessibility),
+                                methodSymbol.Name,
+                                methodSymbolParameter.Name);
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string ToStringAccessibility(Accessibility methodSymbolDeclaredAccessibility)
+        {
+            return methodSymbolDeclaredAccessibility switch
+            {
+                Accessibility.Internal => "internal",
+                Accessibility.Private => "internal",
+                Accessibility.Public => "public",
+                _ => throw new ArgumentOutOfRangeException(nameof(methodSymbolDeclaredAccessibility), methodSymbolDeclaredAccessibility, null)
+            };
         }
 
         private bool IsMediatRInterface(INamedTypeSymbol implementedInterface, out Lifetime lifetime)
         {
             if (implementedInterface.IsGenericType)
             {
-                return _wellknownInterfaces.TryGetValue(implementedInterface.ConstructedFrom, out lifetime);
+                return _wellKnownInterfaces.TryGetValue(implementedInterface.ConstructedFrom, out lifetime);
             }
 
             lifetime = default;
@@ -64,6 +106,6 @@ namespace MediatR.DependencyInjection.SourceGenerator.Discovery
 
         public IEnumerable<IRegistration> Registrations => _registrations;
 
-        public string RegistrationClassNamespace { get; private set; }
+        public RegistrationWriterConfiguration WriterConfig { get; private set; }
     }
 }
