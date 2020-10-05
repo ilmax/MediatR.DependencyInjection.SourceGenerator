@@ -63,7 +63,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
                 _methodName = methodName;
             }
 
-            _generatedFileName = $"{_className}.generated.cs";
+            _generatedFileName = $"{_className}.g.cs";
             InitializeMediatRInterfaces(context.Compilation, WellKnownInterfacesLifetime);
         }
 
