@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 
 namespace MediatR.DependencyInjection.SourceGenerator
 {
-    // TODO Add discovery support for classes outside this compilation (i.e. in another project)
+    // TODO Verify support for classes outside this compilation (i.e. in another project)
     // TODO Report failures/diagnostics properly
     // TODO De-dup registrations
     // TODO? Use proper Roslyn formatting
