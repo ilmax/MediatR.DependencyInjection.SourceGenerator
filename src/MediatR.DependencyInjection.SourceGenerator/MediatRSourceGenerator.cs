@@ -28,7 +28,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
         private string _classNamespace;
         private string _generatedFileName;
 
-        public void Execute(SourceGeneratorContext context)
+        public void Execute(GeneratorExecutionContext context)
         {
             //Debugger.Launch(); //Uncomment this to debug
 
@@ -46,7 +46,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
             context.AddSource(_generatedFileName, source);
         }
 
-        private void InitializeSourceGenerator(SourceGeneratorContext context)
+        private void InitializeSourceGenerator(GeneratorExecutionContext context)
         {
             if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue($"build_property.{nameof(MediatRSourceGenerator)}_ClassNamespace", out var classNamespace))
             {
@@ -67,7 +67,7 @@ namespace MediatR.DependencyInjection.SourceGenerator
             InitializeMediatRInterfaces(context.Compilation, WellKnownInterfacesLifetime);
         }
 
-        public void Initialize(InitializationContext context)
+        public void Initialize(GeneratorInitializationContext context)
         {
         }
 
