@@ -1,9 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
 using Xunit;
 
-namespace MediatR.Extensions.Microsoft.DependencyInjection.SourceGenerator.Tests
+namespace MediatR.DependencyInjection.SourceGenerator.Tests
 {
     public class RegistrationsTests
     {
@@ -41,7 +42,7 @@ namespace MediatR.Extensions.Microsoft.DependencyInjection.SourceGenerator.Tests
                 Assert.Contains(sc2, d => d.ServiceType == descriptor.ServiceType && d.Lifetime == descriptor.Lifetime);
             });
         }
-        
+
         [Fact]
         public void RegisterServices_registers_same_services()
         {
@@ -71,12 +72,19 @@ namespace MediatR.Extensions.Microsoft.DependencyInjection.SourceGenerator.Tests
                 if (ReferenceEquals(y, null)) return false;
                 if (x.GetType() != y.GetType()) return false;
 
-                return x.Lifetime == y.Lifetime && x.ServiceType == y.ServiceType && x.ImplementationType == y.ImplementationType && Equals(x.ImplementationInstance, y.ImplementationInstance) && Equals(x.ImplementationFactory, y.ImplementationFactory);
+                if (x.ImplementationFactory == null)
+                {
+                    return x.Lifetime == y.Lifetime && x.ServiceType == y.ServiceType && x.ImplementationType == y.ImplementationType && Equals(x.ImplementationInstance, y.ImplementationInstance);
+                }
+                else
+                {
+                    return x.Lifetime == y.Lifetime && x.ServiceType == y.ServiceType && x.ImplementationType == y.ImplementationType && x.ImplementationFactory.GetType().GenericTypeArguments.Last() == y.ImplementationFactory?.GetType().GenericTypeArguments.Last();
+                }
             }
 
             public int GetHashCode(ServiceDescriptor obj)
             {
-                return HashCode.Combine((int) obj.Lifetime, obj.ServiceType, obj.ImplementationType, obj.ImplementationInstance, obj.ImplementationFactory);
+                return HashCode.Combine((int)obj.Lifetime, obj.ServiceType, obj.ImplementationType, obj.ImplementationInstance, obj.ImplementationFactory?.GetType().GenericTypeArguments.Last());
             }
         }
     }

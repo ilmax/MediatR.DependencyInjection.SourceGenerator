@@ -6,7 +6,7 @@ namespace MediatR.DependencyInjection.SourceGenerator.Registrations
     [DebuggerDisplay("{ServiceType} -> {ImplementationFactory} ({Lifetime})nq")]
     class DelegateRegistration : IRegistration, IEquatable<DelegateRegistration>
     {
-        public DelegateRegistration(string serviceType, string implementationFactory, Lifetime lifetime)
+        public DelegateRegistration(string serviceType, string implementationFactory, Lifetime lifetime, bool useTryAdd = false)
         {
             if (string.IsNullOrEmpty(serviceType))
             {
@@ -21,6 +21,7 @@ namespace MediatR.DependencyInjection.SourceGenerator.Registrations
             ServiceType = serviceType;
             ImplementationFactory = implementationFactory;
             Lifetime = lifetime;
+            UseTryAdd = useTryAdd;
         }
 
         public string ServiceType { get; }
@@ -28,6 +29,8 @@ namespace MediatR.DependencyInjection.SourceGenerator.Registrations
         public string ImplementationFactory { get; }
 
         public Lifetime Lifetime { get; }
+        
+        public bool UseTryAdd { get; }
 
         public override int GetHashCode() => (ServiceType, ImplementationFactory).GetHashCode();
 
@@ -42,9 +45,13 @@ namespace MediatR.DependencyInjection.SourceGenerator.Registrations
 
         public string ToRegistration() => Lifetime switch
         {
-            Lifetime.Transient => $"AddTransient<{ServiceType}>({ImplementationFactory});",
-            Lifetime.Scoped => $"AddScoped<{ServiceType}>({ImplementationFactory});",
-            Lifetime.Singleton => $"AddSingleton<{ServiceType}>({ImplementationFactory});",
+            Lifetime.Transient when !UseTryAdd => $"AddTransient<{ServiceType}>({ImplementationFactory});",
+            Lifetime.Scoped when !UseTryAdd => $"AddScoped<{ServiceType}>({ImplementationFactory});",
+            Lifetime.Singleton when !UseTryAdd => $"AddSingleton<{ServiceType}>({ImplementationFactory});",
+            
+            Lifetime.Transient when UseTryAdd => $"TryAdd(new ServiceDescriptor(typeof({ServiceType}), {ImplementationFactory}, ServiceLifetime.Transient));",
+            Lifetime.Scoped when UseTryAdd => $"TryAdd(new ServiceDescriptor(typeof({ServiceType}), {ImplementationFactory}, ServiceLifetime.Scoped));",
+            Lifetime.Singleton when UseTryAdd => $"TryAdd(new ServiceDescriptor(typeof({ServiceType}), {ImplementationFactory}, ServiceLifetime.Singleton));",
             _ => throw new ArgumentOutOfRangeException(nameof(Lifetime)),
         };
     }

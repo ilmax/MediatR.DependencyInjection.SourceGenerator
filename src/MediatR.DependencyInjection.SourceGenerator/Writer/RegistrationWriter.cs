@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Text;
-using MediatR.DependencyInjection.SourceGenerator.Registrations;
+﻿using MediatR.DependencyInjection.SourceGenerator.Registrations;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Generic;
+using System.Text;
 
 namespace MediatR.DependencyInjection.SourceGenerator.Writer
 {
@@ -11,8 +11,10 @@ namespace MediatR.DependencyInjection.SourceGenerator.Writer
 
         private static readonly IRegistration[] RequiredRegistrations =
         {
-            new DelegateRegistration("MediatR.ServiceFactory", "p => p.GetService", Lifetime.Transient),
+            new DelegateRegistration("MediatR.ServiceFactory", "sp => sp.GetService", Lifetime.Transient),
             new NonGenericRegistration("MediatR.IMediator", "MediatR.Mediator", Lifetime.Transient),
+            new DelegateRegistration("MediatR.ISender", "sp => sp.GetService<MediatR.IMediator>()", Lifetime.Transient, useTryAdd:true),
+            new DelegateRegistration("MediatR.IPublisher", "sp => sp.GetService<MediatR.IMediator>()", Lifetime.Transient, useTryAdd:true),
             new NonGenericRegistration("MediatR.IPipelineBehavior<,>", "MediatR.Pipeline.RequestPreProcessorBehavior<,>", Lifetime.Transient),
             new NonGenericRegistration("MediatR.IPipelineBehavior<,>", "MediatR.Pipeline.RequestPostProcessorBehavior<,>", Lifetime.Transient),
             new NonGenericRegistration("MediatR.IPipelineBehavior<,>", "MediatR.Pipeline.RequestExceptionActionProcessorBehavior<,>", Lifetime.Transient),
@@ -30,6 +32,7 @@ namespace MediatR.DependencyInjection.SourceGenerator.Writer
             var sourceBuilder = new StringBuilder($@"
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace {_configuration.Namespace}
 {{
@@ -38,7 +41,7 @@ namespace {_configuration.Namespace}
         {_configuration.MethodModifier} static {partialModifier}void {_configuration.MethodName}(this IServiceCollection {_configuration.ServicesParameterName}) 
         {{
 ");
-            var indent = new string(' ', 3*4);
+            var indent = new string(' ', 3 * 4);
             // add the required registrations for the library itself
             foreach (var registration in RequiredRegistrations)
             {
@@ -46,9 +49,16 @@ namespace {_configuration.Namespace}
             }
 
             // add the filepath of each tree to the class we're building
-            foreach (var registration in discoveredRegistrations)
+            using var enumerator = discoveredRegistrations.GetEnumerator();
+            if (enumerator.MoveNext())
             {
-                sourceBuilder.AppendLine($"{indent}{_configuration.ServicesParameterName}.{registration.ToRegistration()}");
+                sourceBuilder.Append($"{indent}{_configuration.ServicesParameterName}.{enumerator.Current.ToRegistration()}");
+            }
+
+            while (enumerator.MoveNext())
+            {
+                sourceBuilder.AppendLine();
+                sourceBuilder.Append($"{indent}{_configuration.ServicesParameterName}.{enumerator.Current.ToRegistration()}");
             }
 
             sourceBuilder.AppendLine(@$"

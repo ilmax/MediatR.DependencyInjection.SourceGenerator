@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MediatR.Pipeline;
 
-namespace MediatR.Extensions.Microsoft.DependencyInjection.SourceGenerator.Tests
+namespace MediatR.DependencyInjection.SourceGenerator.Tests
 {
     public class AResponse { }
     public class ARequestWithResponse : IRequest<AResponse> { }
